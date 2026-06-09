@@ -1,10 +1,15 @@
-# barq - Free Barcode & QR Code Generator
+# barq — Free Barcode & QR Code Generator
 
-100% client-side. No server uploads. No tracking. No ads. MIT Licensed.
+100% client-side. Nothing uploaded, nothing tracked. No ads. MIT Licensed.
 
-**Features:**
-- EAN-13, UPC-A, Code 128, QR codes
-- Export SVG, PNG, JPG
-- Offline-ready (PWA)
+**Barcodes:** EAN-13, EAN-8, UPC-A, Code 128 with artistic shape masks and custom colors.
 
-**Live:** https://barq.khit.be
+**QR Codes:** URLs, text, contact info with logo overlay, error correction, and recent history.
+
+**Export:** SVG, PNG, JPG. Batch ZIP download. Copy SVG to clipboard. `Ctrl+Enter` shortcut.
+
+**Live:** [barq.khit.be](https://barq.khit.be)
+
+---
+
+Built by [KHIT](https://www.khit.be)
