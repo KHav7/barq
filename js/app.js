@@ -1,3 +1,4 @@
+//barq.khit.be
 (function() {
     const defaultState = {
         mode: 'barcode',
@@ -12,8 +13,8 @@
     };
     const savedStateStr = localStorage.getItem('barq_state');
     const savedState = savedStateStr ? JSON.parse(savedStateStr) : {};
-    const state = { 
-        ...defaultState, 
+    const state = {
+        ...defaultState,
         ...savedState,
         customShapeMask: null,
         qrLogoDataUrl: null,
@@ -52,9 +53,9 @@
     };
     let shapeKeys = Object.keys(SHAPES);
     const COLORS = [
-        {name:'Black', code:'#000000'}, 
+        {name:'Black', code:'#000000'},
         {name:'Barq Blue', code:'#003DA5'},
-        {name:'Crimson', code:'#C41230'}, 
+        {name:'Crimson', code:'#C41230'},
         {name:'Forest', code:'#1B5E20'},
         {name:'Orange', code:'#E65100'}
     ];
@@ -105,10 +106,18 @@
     barcodeModeBtn.addEventListener('click', () => switchMode('barcode'));
     qrModeBtn.addEventListener('click', () => switchMode('qrcode'));
     function normalizeUrl(input) {
-        let trimmed = input.trim();
+        let trimmed = (input || '').trim();
         if (!trimmed) return trimmed;
-         if (/^[a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z]{2,}/.test(trimmed) && !/\s/.test(trimmed) && !/^https?:\/\//i.test(trimmed)) return 'https://' + trimmed;
 
+        if (/^[a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z]{2,}/.test(trimmed) && !/\s/.test(trimmed) && !/^https?:\/\//i.test(trimmed)) {
+            return 'https://' + trimmed;
+        }
+
+        if (/^https?:\/\//i.test(trimmed)) {
+            return trimmed;
+        }
+
+        return trimmed;
     }
     function calcEAN13Check(d12) { let sum=0; for(let i=0;i<12;i++) sum+=parseInt(d12[i]||0)*(i%2===0?1:3); return String((10-(sum%10))%10); }
     function calcEAN8Check(d7) { let sum=0; for(let i=0;i<7;i++) sum+=parseInt(d7[i]||0)*(i%2===0?3:1); return String((10-(sum%10))%10); }
@@ -172,10 +181,10 @@
         const fontStr=`font-family="'Space Mono',monospace" font-size="18" font-weight="700" fill="${state.color}" letter-spacing="2"`;
         const isEAN13=(state.format==='EAN13'&&bars.length===30), isEAN8=(state.format==='EAN8'&&bars.length===22), isUPCA=(state.format==='UPCA'&&bars.length===30);
         let svg='';
-        if(state.shape!=='classic') { 
+        if(state.shape!=='classic') {
             const defs = getActiveShapeMaskDef();
             const maskAttr = state.customShapeMask ? `mask="url(#artMask)"` : `clip-path="url(#artClip)"`;
-            svg+=`<defs>${defs}</defs><g ${maskAttr}>`; 
+            svg+=`<defs>${defs}</defs><g ${maskAttr}>`;
         }
         bars.forEach(b=>{ const sx=(b.x-minX)*scaleX+offsetX; svg+=`<rect x="${sx}" y="10" width="${Math.max(1,b.width*scaleX)}" height="${artBottom-10}" fill="${state.color}" shape-rendering="crispEdges"/>`; });
         if(state.shape!=='classic') svg+=`</g>`;
@@ -188,8 +197,8 @@
         saveState();
     }
     function renderQR() {
-        const rawContent = qrContentInput.value;
-        const content = normalizeUrl(rawContent);
+        const rawContent = qrContentInput.value || '';
+        const content = normalizeUrl(rawContent) || '';
         state.qrContent = rawContent;
         if (!rawContent.trim()) {
             qrSvg.innerHTML = '<text x="150" y="150" text-anchor="middle" font-family="\'Space Mono\',monospace" font-size="14" fill="#aaa">ENTER URL OR TEXT</text>';
@@ -206,8 +215,9 @@
             document.body.appendChild(hiddenDiv);
             new QRCode(hiddenDiv, { text: content, width: 300, height: 300, colorDark: state.qrColor, colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel[state.qrEcl] });
             setTimeout(() => {
+                if (qrContentInput.value !== rawContent) return;
                 const canvas = hiddenDiv.querySelector('canvas');
-                document.body.removeChild(hiddenDiv);
+                if(hiddenDiv.parentNode) document.body.removeChild(hiddenDiv);
                 let svgContent = '';
                 if (canvas) {
                     const ctx = canvas.getContext('2d');
@@ -216,7 +226,8 @@
                     for (let y = 0; y < 300; y++) {
                         for (let x = 0; x < 300; x++) {
                             const idx = (y * 300 + x) * 4;
-                            const isDark = (pixels[idx] + pixels[idx+1] + pixels[idx+2]) < 750;
+                            const isDark = pixels[idx+3] > 128 && (pixels[idx] + pixels[idx+1] + pixels[idx+2]) < 750;
+
                             if (isDark) {
                                 if (x < minX) minX = x; if (x > maxX) maxX = x;
                                 if (y < minY) minY = y; if (y > maxY) maxY = y;
@@ -233,7 +244,8 @@
                     for (let y = minY; y <= maxY; y += step) {
                         for (let x = minX; x <= maxX; x += step) {
                             const idx = (Math.round(y) * 300 + Math.round(x)) * 4;
-                            const isDark = (pixels[idx] + pixels[idx+1] + pixels[idx+2]) < 750;
+                            const isDark = pixels[idx+3] > 128 && (pixels[idx] + pixels[idx+1] + pixels[idx+2]) < 750;
+
                             if (isDark) {
                                 svgContent += `<rect x="${offsetX + (x - minX)}" y="${offsetY + (y - minY)}" width="${step}" height="${step}" fill="${state.qrColor}" shape-rendering="crispEdges"/>`;
                             }
@@ -248,7 +260,7 @@
                     svgContent += `<image href="${state.qrLogoDataUrl.src}" x="${lx}" y="${ly}" width="${lW}" height="${lH}" preserveAspectRatio="xMidYMid meet"/>`;
                 }
                 qrSvg.innerHTML = svgContent;
-                qrInputFeedback.textContent = 'QR code generated · scans as: ' + (content.length > 40 ? content.slice(0,40)+'...' : content);
+                qrInputFeedback.textContent = 'QR code generated · scans as: ' + (content?.length > 40 ? content.slice(0,40)+'...' : (content || ''));
                 qrInputFeedback.className = 'input-feedback success';
                 qrContentInput.classList.add('valid');
                 qrContentInput.classList.remove('invalid');
@@ -264,7 +276,8 @@
     function updateClearLogoButton() { clearQrLogo.style.display = state.qrLogoDataUrl ? 'inline-block' : 'none'; }
     async function getQrSvgString() {
         return new Promise((resolve) => {
-            const content = normalizeUrl(state.qrContent);
+            const rawContent = state.qrContent || '';
+            const content = normalizeUrl(rawContent) || '';
             if (!content.trim()) { resolve(''); return; }
             const hiddenDiv = document.createElement('div');
             hiddenDiv.style.cssText = 'position:absolute;left:-9999px;top:-9999px;';
@@ -280,7 +293,7 @@
                     for (let y = 0; y < 300; y++) {
                         for (let x = 0; x < 300; x++) {
                             const idx = (y * 300 + x) * 4;
-                            const isDark = (pixels[idx] + pixels[idx+1] + pixels[idx+2]) < 750;
+                            const isDark = pixels[idx+3] > 128 && (pixels[idx] + pixels[idx+1] + pixels[idx+2]) < 750;
                             if (isDark) {
                                 if (x < minX) minX = x; if (x > maxX) maxX = x;
                                 if (y < minY) minY = y; if (y > maxY) maxY = y;
@@ -296,7 +309,7 @@
                     for (let y = minY; y <= maxY; y += step) {
                         for (let x = minX; x <= maxX; x += step) {
                             const idx = (Math.round(y) * 300 + Math.round(x)) * 4;
-                            const isDark = (pixels[idx] + pixels[idx+1] + pixels[idx+2]) < 750;
+                            const isDark = pixels[idx+3] > 128 && (pixels[idx] + pixels[idx+1] + pixels[idx+2]) < 750;
                             if (isDark) {
                                 svgContent += `<rect x="${offsetX+(x-minX)}" y="${offsetY+(y-minY)}" width="${step}" height="${step}" fill="${state.qrColor}" shape-rendering="crispEdges"/>`;
                             }
@@ -310,14 +323,13 @@
                         svgContent += `<image href="${state.qrLogoDataUrl.src}" x="${lx}" y="${ly}" width="${lW}" height="${lH}" preserveAspectRatio="xMidYMid meet"/>`;
                     }
                 }
-                document.body.removeChild(hiddenDiv);
-               resolve(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="300" height="300">${svgContent}</svg>`);
-
+                if(hiddenDiv.parentNode) document.body.removeChild(hiddenDiv);
+                resolve(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="300" height="300">${svgContent}</svg>`);
             }, 100);
         });
     }
     function addQRHistory() {
-        if (!state.qrContent.trim()) return;
+        if (!state.qrContent || !state.qrContent.trim()) return;
         const entry = { content: state.qrContent, ecl: state.qrEcl, color: state.qrColor };
         state.qrHistory = [entry, ...state.qrHistory.filter(e=>e.content!==state.qrContent)].slice(0,MAX_HISTORY);
         saveState();
@@ -326,21 +338,22 @@
     function renderQRHistory() {
         qrHistorySection.style.display = state.qrHistory.length?'block':'none';
         qrHistoryList.innerHTML = '';
-        state.qrHistory.forEach(e=>{ 
-            const b=document.createElement('button'); 
-            b.className='history-item'; 
-            b.textContent=e.content.slice(0,25)+(e.content.length>25?'…':''); 
-            b.onclick=()=>{ 
-                state.qrContent=e.content; state.qrEcl=e.ecl; state.qrColor=e.color; 
-                qrContentInput.value=e.content; 
-                updateQRErrorButtons(); updateQRColorDots(); renderQR(); animate(qrPreviewContainer); 
-            }; 
-            qrHistoryList.appendChild(b); 
+        state.qrHistory.forEach(e=>{
+            const b=document.createElement('button');
+            b.className='history-item';
+            const safeContent = e.content || '';
+            b.textContent = safeContent.slice(0,25) + (safeContent.length > 25 ? '…' : '');
+            b.onclick=()=>{
+                state.qrContent=safeContent; state.qrEcl=e.ecl; state.qrColor=e.color;
+                qrContentInput.value=safeContent;
+                updateQRErrorButtons(); updateQRColorDots(); renderQR(); animate(qrPreviewContainer);
+            };
+            qrHistoryList.appendChild(b);
         });
     }
     function generateStencilFromImageSource(src, callback) {
         const img = new Image();
-        img.crossOrigin = "Anonymous"; 
+        img.crossOrigin = "Anonymous";
         img.onload = () => {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
@@ -355,15 +368,15 @@
                 for (let i = 0; i < data.length; i += 4) {
                     const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
                     const brightness = (r + g + b) / 3;
-                    if (a > 50 && brightness < 200) { 
-                        data[i] = 255; data[i+1] = 255; data[i+2] = 255; data[i+3] = 255; 
-                    } else { 
-                        data[i] = 0; data[i+1] = 0; data[i+2] = 0; data[i+3] = 255; 
+                    if (a > 50 && brightness < 200) {
+                        data[i] = 255; data[i+1] = 255; data[i+2] = 255; data[i+3] = 255;
+                    } else {
+                        data[i] = 0; data[i+1] = 0; data[i+2] = 0; data[i+3] = 255;
                     }
                 }
                 ctx.putImageData(imgData, 0, 0);
                 const maskDataUrl = canvas.toDataURL('image/png');
-                const offsetX = 25 + (260 - w) / 2; 
+                const offsetX = 25 + (260 - w) / 2;
                 const offsetY = 10 + (260 - h) / 2;
                 callback({ src: maskDataUrl, w, h, x: offsetX, y: offsetY });
             } catch (err) {
@@ -376,34 +389,34 @@
     }
     function buildShapes() {
         shapeGrid.innerHTML='';
-        shapeKeys.filter(k=>k!=='custom').forEach(k=>{ 
-            const b=document.createElement('button'); 
-            b.className='shape-btn'; b.dataset.shape=k; 
-            if(k===state.shape) b.classList.add('active-shape'); 
-            b.textContent=SHAPES[k].name; 
-            b.onclick=()=>{ 
-                state.shape=k; updateActiveShapeButton(); 
+        shapeKeys.filter(k=>k!=='custom').forEach(k=>{
+            const b=document.createElement('button');
+            b.className='shape-btn'; b.dataset.shape=k;
+            if(k===state.shape) b.classList.add('active-shape');
+            b.textContent=SHAPES[k].name;
+            b.onclick=()=>{
+                state.shape=k; updateActiveShapeButton();
                 if (SHAPES[k].url) {
                     generateStencilFromImageSource(SHAPES[k].url, (maskData) => {
                         if (maskData) { state.customShapeMask = maskData; renderBarcode(); animate(previewContainer); }
                         else { state.shape = 'classic'; updateActiveShapeButton(); renderBarcode(); animate(previewContainer); }
                     });
                 } else {
-                    state.customShapeMask=null; renderBarcode(); animate(previewContainer); 
+                    state.customShapeMask=null; renderBarcode(); animate(previewContainer);
                 }
-            }; 
-            shapeGrid.appendChild(b); 
+            };
+            shapeGrid.appendChild(b);
         });
-        const cb=document.createElement('button'); 
-        cb.className='shape-btn'; cb.dataset.shape='custom'; 
-        if(state.shape==='custom') cb.classList.add('active-shape'); 
-        cb.textContent='+ UPLOAD'; 
-        cb.onclick=()=>{ 
-            state.shape='custom'; 
+        const cb=document.createElement('button');
+        cb.className='shape-btn'; cb.dataset.shape='custom';
+        if(state.shape==='custom') cb.classList.add('active-shape');
+        cb.textContent='+ UPLOAD';
+        cb.onclick=()=>{
+            state.shape='custom';
             state.customShapeMask=null;
-            updateActiveShapeButton(); 
-            customSvgUpload.click(); 
-        }; 
+            updateActiveShapeButton();
+            customSvgUpload.click();
+        };
         shapeGrid.appendChild(cb);
     }
     function updateActiveShapeButton() {
@@ -411,41 +424,41 @@
     }
     function buildColors() {
         colorRow.innerHTML='';
-        COLORS.forEach(c=>{ 
-            const d=document.createElement('button'); 
-            d.className='color-dot'; 
-            if(c.code===state.color) d.classList.add('selected'); 
-            d.style.backgroundColor=c.code; d.title=c.name; 
-            d.onclick=()=>{ state.color=c.code; customColorPickerBarcode.value=c.code; updateColorDots(); renderBarcode(); }; 
-            colorRow.appendChild(d); 
+        COLORS.forEach(c=>{
+            const d=document.createElement('button');
+            d.className='color-dot';
+            if(c.code===state.color) d.classList.add('selected');
+            d.style.backgroundColor=c.code; d.title=c.name;
+            d.onclick=()=>{ state.color=c.code; customColorPickerBarcode.value=c.code; updateColorDots(); renderBarcode(); };
+            colorRow.appendChild(d);
         });
     }
     function buildQRColors() {
         qrColorRow.innerHTML='';
-        COLORS.forEach(c=>{ 
-            const d=document.createElement('button'); 
-            d.className='color-dot'; 
-            if(c.code===state.qrColor) d.classList.add('selected'); 
-            d.style.backgroundColor=c.code; d.title=c.name; 
-            d.onclick=()=>{ state.qrColor=c.code; customColorPickerQR.value=c.code; updateQRColorDots(); renderQR(); }; 
-            qrColorRow.appendChild(d); 
+        COLORS.forEach(c=>{
+            const d=document.createElement('button');
+            d.className='color-dot';
+            if(c.code===state.qrColor) d.classList.add('selected');
+            d.style.backgroundColor=c.code; d.title=c.name;
+            d.onclick=()=>{ state.qrColor=c.code; customColorPickerQR.value=c.code; updateQRColorDots(); renderQR(); };
+            qrColorRow.appendChild(d);
         });
     }
-    function updateColorDots() { 
-        document.querySelectorAll('#colorRow .color-dot').forEach(d=>{ 
-            const bg=d.style.backgroundColor; 
-            const isSel=bg===state.color||(bg.startsWith('rgb')&&rgbToHex(bg)===state.color); 
-            d.classList.toggle('selected',isSel); 
-        }); 
-        customColorPickerBarcode.value = state.color; 
+    function updateColorDots() {
+        document.querySelectorAll('#colorRow .color-dot').forEach(d=>{
+            const bg=d.style.backgroundColor;
+            const isSel=bg===state.color||(bg.startsWith('rgb')&&rgbToHex(bg)===state.color);
+            d.classList.toggle('selected',isSel);
+        });
+        customColorPickerBarcode.value = state.color;
     }
-    function updateQRColorDots() { 
-        document.querySelectorAll('#qrColorRow .color-dot').forEach(d=>{ 
-            const bg=d.style.backgroundColor; 
-            const isSel=bg===state.qrColor||(bg.startsWith('rgb')&&rgbToHex(bg)===state.qrColor); 
-            d.classList.toggle('selected',isSel); 
-        }); 
-        customColorPickerQR.value = state.qrColor; 
+    function updateQRColorDots() {
+        document.querySelectorAll('#qrColorRow .color-dot').forEach(d=>{
+            const bg=d.style.backgroundColor;
+            const isSel=bg===state.qrColor||(bg.startsWith('rgb')&&rgbToHex(bg)===state.qrColor);
+            d.classList.toggle('selected',isSel);
+        });
+        customColorPickerQR.value = state.qrColor;
     }
     function updateFormatButtons() { formatRow.querySelectorAll('.fmt-btn').forEach(b=>b.classList.toggle('active',b.dataset.format===state.format)); }
     function updateQRErrorButtons() { qrErrorRow.querySelectorAll('.fmt-btn').forEach(b=>b.classList.toggle('active',b.dataset.ecl===state.qrEcl)); }
@@ -453,87 +466,87 @@
     function rgbToHex(c) { if(c.startsWith('#')) return c; const m=c.match(/[\d.]+/g); if(!m||m.length<3) return c; return '#'+m.slice(0,3).map(x=>parseInt(x).toString(16).padStart(2,'0')).join(''); }
     customColorPickerBarcode.addEventListener('input', (e) => { state.color = e.target.value; updateColorDots(); renderBarcode(); });
     customColorPickerQR.addEventListener('input', (e) => { state.qrColor = e.target.value; updateQRColorDots(); renderQR(); });
-    function downloadFile(content, filename, type) { 
-        const b=new Blob([content],{type}), u=URL.createObjectURL(b), a=document.createElement('a'); 
-        a.href=u; a.download=filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(u); 
+    function downloadFile(content, filename, type) {
+        const b=new Blob([content],{type}), u=URL.createObjectURL(b), a=document.createElement('a');
+        a.href=u; a.download=filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(u);
     }
-    function getBarcodeSvgString() { 
-        const clone=barcodeSvg.cloneNode(true); 
+    function getBarcodeSvgString() {
+        const clone=barcodeSvg.cloneNode(true);
         clone.setAttribute('xmlns','http://www.w3.org/2000/svg');
 let s=new XMLSerializer().serializeToString(clone);
 if(!s.includes('xmlns=')) s=s.replace('<svg','<svg xmlns="http://www.w3.org/2000/svg"'); return s;
     }
-    function exportBarcodeRaster(format, size) { 
-        return new Promise(resolve=>{ 
-            const svgStr=getBarcodeSvgString(), img=new Image(), u=URL.createObjectURL(new Blob([svgStr],{type:'image/svg+xml;charset=utf-8'})); 
-            img.onload=()=>{ 
-                const w=size, h=Math.round(size*(340/300)); exportCanvas.width=w; exportCanvas.height=h; 
-                const ctx=exportCanvas.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h); ctx.drawImage(img,0,0,w,h); 
-                exportCanvas.toBlob(blob=>{ URL.revokeObjectURL(u); resolve(blob); }, format==='jpg'?'image/jpeg':'image/png',0.95); 
-            }; 
-            img.src=u; 
-        }); 
+    function exportBarcodeRaster(format, size) {
+        return new Promise(resolve=>{
+            const svgStr=getBarcodeSvgString(), img=new Image(), u=URL.createObjectURL(new Blob([svgStr],{type:'image/svg+xml;charset=utf-8'}));
+            img.onload=()=>{
+                const w=size, h=Math.round(size*(340/300)); exportCanvas.width=w; exportCanvas.height=h;
+                const ctx=exportCanvas.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h); ctx.drawImage(img,0,0,w,h);
+                exportCanvas.toBlob(blob=>{ URL.revokeObjectURL(u); resolve(blob); }, format==='jpg'?'image/jpeg':'image/png',0.95);
+            };
+            img.src=u;
+        });
     }
-    function doBarcodeExport() { 
-        if(!state.digits){showToast('ENTER DIGITS');return;} 
-        const exportFormat = exportFormatBarcode.value; 
+    function doBarcodeExport() {
+        if(!state.digits){showToast('ENTER DIGITS');return;}
+        const exportFormat = exportFormatBarcode.value;
         const exportSize = parseInt(exportSizeBarcode.value);
-        if(exportFormat==='svg'){ 
-            downloadFile(getBarcodeSvgString(),`barq-${state.shape}-${state.digits.slice(0,8)}.svg`,'image/svg+xml'); showToast('SVG DOWNLOADED'); 
-        } else { 
-            exportBarcodeRaster(exportFormat,exportSize).then(blob=>{ downloadFile(blob,`barq-${state.shape}-${state.digits.slice(0,8)}.${exportFormat}`,exportFormat==='jpg'?'image/jpeg':'image/png'); showToast(`${exportFormat.toUpperCase()} DOWNLOADED`); }); 
-        } 
+        if(exportFormat==='svg'){
+            downloadFile(getBarcodeSvgString(),`barq-${state.shape}-${state.digits.slice(0,8)}.svg`,'image/svg+xml'); showToast('SVG DOWNLOADED');
+        } else {
+            exportBarcodeRaster(exportFormat,exportSize).then(blob=>{ downloadFile(blob,`barq-${state.shape}-${state.digits.slice(0,8)}.${exportFormat}`,exportFormat==='jpg'?'image/jpeg':'image/png'); showToast(`${exportFormat.toUpperCase()} DOWNLOADED`); });
+        }
     }
-    async function doQRExport() { 
-        if(!state.qrContent.trim()){showToast('ENTER CONTENT');return;} 
-        const qrExportFormat = exportFormatQR.value; 
-        const qrExportSize = parseInt(exportSizeQR.value); 
-        const svgStr = await getQrSvgString(); 
-        if(qrExportFormat==='svg'){ 
-            downloadFile(svgStr,`barq-qr-${state.qrContent.slice(0,15).replace(/[^a-zA-Z0-9]/g,'_')}.svg`,'image/svg+xml'); showToast('SVG DOWNLOADED'); 
-        } else { 
-            const img=new Image(), u=URL.createObjectURL(new Blob([svgStr],{type:'image/svg+xml;charset=utf-8'})); 
-            img.onload=()=>{ 
-                const s=qrExportSize; exportCanvas.width=s; exportCanvas.height=s; 
-                const ctx=exportCanvas.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,s,s); ctx.drawImage(img,0,0,s,s); 
-                exportCanvas.toBlob(blob=>{ URL.revokeObjectURL(u); downloadFile(blob,`barq-qr-${state.qrContent.slice(0,15).replace(/[^a-zA-Z0-9]/g,'_')}.${qrExportFormat}`,qrExportFormat==='jpg'?'image/jpeg':'image/png'); showToast(`${qrExportFormat.toUpperCase()} DOWNLOADED`); },qrExportFormat==='jpg'?'image/jpeg':'image/png',0.95); 
-            }; 
-            img.src=u; 
-        } 
-        addQRHistory(); 
+    async function doQRExport() {
+        if(!state.qrContent || !state.qrContent.trim()){showToast('ENTER CONTENT');return;}
+        const qrExportFormat = exportFormatQR.value;
+        const qrExportSize = parseInt(exportSizeQR.value);
+        const svgStr = await getQrSvgString();
+        if(qrExportFormat==='svg'){
+            downloadFile(svgStr,`barq-qr-${state.qrContent.slice(0,15).replace(/[^a-zA-Z0-9]/g,'_')}.svg`,'image/svg+xml'); showToast('SVG DOWNLOADED');
+        } else {
+            const img=new Image(), u=URL.createObjectURL(new Blob([svgStr],{type:'image/svg+xml;charset=utf-8'}));
+            img.onload=()=>{
+                const s=qrExportSize; exportCanvas.width=s; exportCanvas.height=s;
+                const ctx=exportCanvas.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,s,s); ctx.drawImage(img,0,0,s,s);
+                exportCanvas.toBlob(blob=>{ URL.revokeObjectURL(u); downloadFile(blob,`barq-qr-${state.qrContent.slice(0,15).replace(/[^a-zA-Z0-9]/g,'_')}.${qrExportFormat}`,qrExportFormat==='jpg'?'image/jpeg':'image/png'); showToast(`${qrExportFormat.toUpperCase()} DOWNLOADED`); },qrExportFormat==='jpg'?'image/jpeg':'image/png',0.95);
+            };
+            img.src=u;
+        }
+        addQRHistory();
     }
-    formatRow.addEventListener('click',e=>{ 
-        const b=e.target.closest('.fmt-btn'); if(!b)return; 
-        state.format=b.dataset.format; updateFormatButtons(); 
-        if(state.format!=='CODE128') state.digits=state.digits.replace(/[^0-9]/g,''); 
-        if(state.format==='EAN13'){ digitInput.maxLength=13; state.digits=state.digits.padEnd(12,'0').slice(0,12); state.digits+=calcEAN13Check(state.digits); } 
-        else if(state.format==='EAN8'){ digitInput.maxLength=8; state.digits=state.digits.padEnd(7,'0').slice(0,7); state.digits+=calcEAN8Check(state.digits); } 
-        else if(state.format==='UPCA'){ digitInput.maxLength=12; state.digits=state.digits.padEnd(11,'0').slice(0,11); state.digits+=calcUPCACheck(state.digits); } 
-        else{ digitInput.maxLength=30; if(state.digits.length>30) state.digits=state.digits.slice(0,30); } 
-        digitInput.value=state.digits; updateValidationUI(); renderBarcode(); animate(previewContainer); 
+    formatRow.addEventListener('click',e=>{
+        const b=e.target.closest('.fmt-btn'); if(!b)return;
+        state.format=b.dataset.format; updateFormatButtons();
+        if(state.format!=='CODE128') state.digits=state.digits.replace(/[^0-9]/g,'');
+        if(state.format==='EAN13'){ digitInput.maxLength=13; state.digits=state.digits.padEnd(12,'0').slice(0,12); state.digits+=calcEAN13Check(state.digits); }
+        else if(state.format==='EAN8'){ digitInput.maxLength=8; state.digits=state.digits.padEnd(7,'0').slice(0,7); state.digits+=calcEAN8Check(state.digits); }
+        else if(state.format==='UPCA'){ digitInput.maxLength=12; state.digits=state.digits.padEnd(11,'0').slice(0,11); state.digits+=calcUPCACheck(state.digits); }
+        else{ digitInput.maxLength=30; if(state.digits.length>30) state.digits=state.digits.slice(0,30); }
+        digitInput.value=state.digits; updateValidationUI(); renderBarcode(); animate(previewContainer);
     });
-    digitInput.addEventListener('input',()=>{ 
-        let v=digitInput.value; 
-        if(state.format!=='CODE128') v=v.replace(/[^0-9]/g,''); 
-        if(state.format==='EAN13'&&v.length>13) v=v.slice(0,13); 
-        if(state.format==='EAN8'&&v.length>8) v=v.slice(0,8); 
-        if(state.format==='UPCA'&&v.length>12) v=v.slice(0,12); 
-        if(state.format==='CODE128'&&v.length>30) v=v.slice(0,30); 
-        if(v!==state.digits){ state.digits=v; digitInput.value=v; updateValidationUI(); renderBarcode(); } 
+    digitInput.addEventListener('input',()=>{
+        let v=digitInput.value;
+        if(state.format!=='CODE128') v=v.replace(/[^0-9]/g,'');
+        if(state.format==='EAN13'&&v.length>13) v=v.slice(0,13);
+        if(state.format==='EAN8'&&v.length>8) v=v.slice(0,8);
+        if(state.format==='UPCA'&&v.length>12) v=v.slice(0,12);
+        if(state.format==='CODE128'&&v.length>30) v=v.slice(0,30);
+        if(v!==state.digits){ state.digits=v; digitInput.value=v; updateValidationUI(); renderBarcode(); }
     });
     downloadBarcodeBtn.addEventListener('click', doBarcodeExport);
     downloadQRBtn.addEventListener('click', doQRExport);
     copyBtn.addEventListener('click',()=>{ if(!state.digits){showToast('ENTER DIGITS');return;} navigator.clipboard.writeText(getBarcodeSvgString()).then(()=>showToast('SVG COPIED')).catch(()=>showToast('COPY FAILED')); });
-    qrCopyBtn.addEventListener('click',async()=>{ if(!state.qrContent.trim()){showToast('ENTER CONTENT');return;} const s=await getQrSvgString(); navigator.clipboard.writeText(s).then(()=>showToast('SVG COPIED')).catch(()=>showToast('COPY FAILED')); addQRHistory(); });
-    customSvgUpload.addEventListener('change', e => { 
-        const file = e.target.files[0]; if (!file) return; 
-        const reader = new FileReader(); 
-        reader.onload = ev => { 
+    qrCopyBtn.addEventListener('click',async()=>{ if(!state.qrContent || !state.qrContent.trim()){showToast('ENTER CONTENT');return;} const s=await getQrSvgString(); navigator.clipboard.writeText(s).then(()=>showToast('SVG COPIED')).catch(()=>showToast('COPY FAILED')); addQRHistory(); });
+    customSvgUpload.addEventListener('change', e => {
+        const file = e.target.files[0]; if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => {
             generateStencilFromImageSource(ev.target.result, (maskData) => {
                 if (maskData) { state.customShapeMask = maskData; state.shape = 'custom'; updateActiveShapeButton(); renderBarcode(); animate(previewContainer); showToast('STENCIL GENERATED'); }
             });
-        }; 
-        reader.readAsDataURL(file); 
+        };
+        reader.readAsDataURL(file);
     });
     batchGenerateBtn.addEventListener('click',async()=>{
         if (state.isBatchGenerating) return;
@@ -546,8 +559,8 @@ if(!s.includes('xmlns=')) s=s.replace('<svg','<svg xmlns="http://www.w3.org/2000
             const zip=new JSZip();
             for(let i=0;i<lines.length;i++){
                 let rt=lines[i];
-                if(state.format==='EAN13'){ rt=rt.padEnd(12,'0').slice(0,12); rt+=calcEAN13Check(rt); } 
-                else if(state.format==='EAN8'){ rt=rt.padEnd(7,'0').slice(0,7); rt+=calcEAN8Check(rt); } 
+                if(state.format==='EAN13'){ rt=rt.padEnd(12,'0').slice(0,12); rt+=calcEAN13Check(rt); }
+                else if(state.format==='EAN8'){ rt=rt.padEnd(7,'0').slice(0,7); rt+=calcEAN8Check(rt); }
                 else if(state.format==='UPCA'){ rt=rt.padEnd(11,'0').slice(0,11); rt+=calcUPCACheck(rt); }
                 const orig=state.digits; state.digits=rt; renderBarcode();
                 const svgStr=getBarcodeSvgString(); state.digits=orig;
@@ -564,11 +577,11 @@ if(!s.includes('xmlns=')) s=s.replace('<svg','<svg xmlns="http://www.w3.org/2000
         const reader = new FileReader();
         reader.onload = ev => {
             const img = new Image();
-            img.onload = () => { 
-                const maxDim = 60; let w = img.width, h = img.height; 
-                if (w > h) { h = (h/w)*maxDim; w = maxDim; } else { w = (w/h)*maxDim; h = maxDim; } 
-                state.qrLogoDataUrl = { src: img.src, w, h }; 
-                updateClearLogoButton(); renderQR(); showToast('LOGO ADDED'); 
+            img.onload = () => {
+                const maxDim = 60; let w = img.width, h = img.height;
+                if (w > h) { h = (h/w)*maxDim; w = maxDim; } else { w = (w/h)*maxDim; h = maxDim; }
+                state.qrLogoDataUrl = { src: img.src, w, h };
+                updateClearLogoButton(); renderQR(); showToast('LOGO ADDED');
             };
             img.src = ev.target.result;
         }; reader.readAsDataURL(f);
@@ -596,10 +609,9 @@ if(!s.includes('xmlns=')) s=s.replace('<svg','<svg xmlns="http://www.w3.org/2000
             renderBarcode(); animate(previewContainer);
         }
         renderQR();
-        if ('serviceWorker' in navigator) { 
-            window.addEventListener('load', () => { 
-              navigator.serviceWorker.register('./js/sw.js').catch(err => { console.log('SW failed: ', err); });
-            }); 
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+            });
         }
     }
     init();

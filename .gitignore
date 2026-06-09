@@ -1,5 +1,35 @@
+# OS generated files
 .DS_Store
-*.log
-*.tmp
-.idea/
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Editor files
 .vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-workspace
+*.sublime-project
+
+# Backup files
+*.bak
+*.backup
+*.tmp
+*.temp
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.*
+
+# Any local-only files
+local.*
+*.local

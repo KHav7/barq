@@ -404,9 +404,32 @@ button { font-family: inherit; }
     border-top: 2px solid var(--black);
     padding-top: 1.2rem;
 }
-.footer a { color: var(--blue); font-weight: 700; text-decoration: underline; text-underline-offset: 4px; }
-.footer a:hover { color: var(--black); }
 
+.footer-left {
+    text-align: left;
+    flex: 1;
+}
+
+.footer-center {
+    text-align: center;
+    flex: 2;
+}
+
+.footer-right {
+    text-align: right;
+    flex: 1;
+}
+
+.footer a {
+    color: var(--blue);
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+
+.footer a:hover {
+    color: var(--black);
+}
 
 .toast {
     position: fixed;
