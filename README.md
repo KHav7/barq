@@ -12,4 +12,4 @@
 
 ---
 
-Built by [KHIT](https://www.khit.be)
+Built by [KH IT Solutions](https://www.khit.be)
